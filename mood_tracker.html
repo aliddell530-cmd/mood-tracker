@@ -446,6 +446,43 @@
   .entry-note { font-size: 14px; color: var(--text); line-height: 1.5; word-break: break-word; }
   .empty-state { text-align: center; padding: 24px 0; color: var(--hint); font-size: 13px; line-height: 1.6; }
 
+  /* EXPORT / IMPORT */
+  .backup-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .backup-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--hint);
+    margin-bottom: 12px;
+  }
+  .backup-row { display: flex; gap: 8px; }
+  .backup-btn {
+    flex: 1;
+    padding: 11px 8px;
+    border-radius: var(--radius-sm);
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    border: 1px solid var(--border);
+  }
+  .backup-btn:active { transform: scale(0.96); }
+  .btn-export { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-export:active { background: #6a59e0; }
+  .btn-import { background: var(--surface2); color: var(--text); }
+  .btn-import:active { background: var(--surface); }
+  .backup-hint { font-size: 11px; color: var(--hint); margin-top: 10px; line-height: 1.5; }
+
   .streak-bar {
     display: flex;
     align-items: center;
@@ -558,6 +595,15 @@
 
   <!-- ══════════ TAB: HISTORY ══════════ -->
   <div id="tab-hist" class="hidden">
+    <div class="backup-section">
+      <div class="backup-title">💾 Резервная копия</div>
+      <div class="backup-row">
+        <button class="backup-btn btn-export" onclick="exportData()">⬇ Экспорт</button>
+        <button class="backup-btn btn-import" onclick="document.getElementById('importFile').click()">⬆ Импорт</button>
+      </div>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+      <div class="backup-hint">Экспорт сохраняет все записи в файл на телефон. Импорт восстанавливает данные из файла.</div>
+    </div>
     <div class="history-list" id="historyList"></div>
   </div>
 
@@ -823,6 +869,56 @@
 
   function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── EXPORT / IMPORT ──
+  function exportData() {
+    const entries = loadEntries();
+    if (!entries.length) { showToast('Нет данных для экспорта', true); return; }
+    const json = JSON.stringify({ version: 2, exported: new Date().toISOString(), entries }, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const now = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    a.download = `mood_backup_${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}.json`;
+    a.href = url;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Файл сохранён ✓', false);
+  }
+
+  function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = JSON.parse(e.target.result);
+        let imported = [];
+        if (Array.isArray(data)) {
+          imported = data;
+        } else if (data.entries && Array.isArray(data.entries)) {
+          imported = data.entries;
+        } else {
+          showToast('Неверный формат файла', true); return;
+        }
+        const existing = loadEntries();
+        // merge — deduplicate by ts
+        const tsSet = new Set(existing.map(e => e.ts));
+        const merged = [...existing];
+        imported.forEach(e => { if (!tsSet.has(e.ts)) merged.push(e); });
+        merged.sort((a,b) => new Date(b.ts) - new Date(a.ts));
+        localStorage.setItem('mood_entries_v2', JSON.stringify(merged));
+        showToast('Импортировано: ' + imported.length + ' записей ✓', false);
+        renderHistory();
+        updateStreak();
+      } catch(err) {
+        showToast('Ошибка чтения файла', true);
+      }
+      event.target.value = '';
+    };
+    reader.readAsText(file);
   }
 
   init();
