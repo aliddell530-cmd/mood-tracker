@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Настроение">
+<title>Трекер настроения</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a22;
+    --surface2: #22222e;
+    --border: rgba(255,255,255,0.07);
+    --text: #f0eeff;
+    --muted: rgba(240,238,255,0.45);
+    --hint: rgba(240,238,255,0.25);
+    --accent: #7c6af7;
+    --accent-dim: rgba(124,106,247,0.15);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --c-awful: #e05b5b;
+    --c-meh: #e09b3d;
+    --c-ok: #7c6af7;
+    --c-good: #4da8da;
+    --c-great: #5bc98a;
+  }
+  body {
+    font-family: 'Manrope', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    overscroll-behavior: none;
+  }
+  .app {
+    max-width: 430px;
+    margin: 0 auto;
+    padding: 52px 20px 100px;
+  }
+
+  /* NAV TABS */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    margin-bottom: 28px;
+  }
+  .tab {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Manrope', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tab.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* HEADER */
+  .header { margin-bottom: 24px; }
+  .date-weekday {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .date-full {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.15;
+  }
+
+  /* DATE PICKER ROW */
+  .date-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .date-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-family: 'Manrope', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    -webkit-appearance: none;
+    color-scheme: dark;
+  }
+  .date-input:focus { border-color: rgba(124,106,247,0.5); }
+
+  /* TIME OF DAY */
+  .tod-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .tod-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.18s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tod-btn.selected {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .tod-btn .tod-em { font-size: 20px; }
+  .tod-btn .tod-lbl { font-size: 10px; font-weight: 600; color: var(--muted); }
+  .tod-btn.selected .tod-lbl { color: var(--text); }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--hint);
+    margin-bottom: 12px;
+  }
+
+  /* MOOD GRID */
+  .mood-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .mood-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 12px 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.18s;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .mood-btn:active { transform: scale(0.94); }
+  .mood-btn.selected {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .mood-btn .em { font-size: 24px; line-height: 1; }
+  .mood-btn .lbl { font-size: 9.5px; font-weight: 600; color: var(--muted); text-align: center; }
+  .mood-btn.selected .lbl { color: var(--text); }
+
+  /* NOTE */
+  .note-wrap { margin-bottom: 16px; }
+  textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    font-family: 'Manrope', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    resize: none;
+    outline: none;
+    transition: border-color 0.18s;
+    line-height: 1.6;
+  }
+  textarea::placeholder { color: var(--hint); }
+  textarea:focus { border-color: rgba(124,106,247,0.5); }
+
+  .save-btn {
+    width: 100%;
+    padding: 15px;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: 'Manrope', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.18s;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    margin-bottom: 8px;
+  }
+  .save-btn:active { transform: scale(0.97); background: #6a59e0; }
+
+  .toast {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    min-height: 20px;
+    margin-bottom: 12px;
+    color: #6ddfb0;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .toast.show { opacity: 1; }
+  .toast.err { color: #f08080; }
+
+  /* ── CALENDAR VIEW ── */
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .cal-nav {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .cal-month-label {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .cal-wd {
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--hint);
+    padding: 4px 0;
+  }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 24px;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transition: transform 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cal-day.empty { background: transparent; border-color: transparent; cursor: default; }
+  .cal-day.today { border-color: var(--accent); }
+  .cal-day-num {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    line-height: 1;
+  }
+  .cal-day.has-data .cal-day-num { color: var(--text); }
+  .cal-dots {
+    display: flex;
+    gap: 2px;
+    margin-top: 3px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 28px;
+  }
+  .cal-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .cal-day:active { transform: scale(0.92); }
+
+  /* mood colors */
+  .mc-awful { background: var(--c-awful); }
+  .mc-meh   { background: var(--c-meh); }
+  .mc-ok    { background: var(--c-ok); }
+  .mc-good  { background: var(--c-good); }
+  .mc-great { background: var(--c-great); }
+
+  .cal-day.filled-awful { background: rgba(224,91,91,0.18); border-color: rgba(224,91,91,0.4); }
+  .cal-day.filled-meh   { background: rgba(224,155,61,0.18); border-color: rgba(224,155,61,0.4); }
+  .cal-day.filled-ok    { background: rgba(124,106,247,0.18); border-color: rgba(124,106,247,0.4); }
+  .cal-day.filled-good  { background: rgba(77,168,218,0.18); border-color: rgba(77,168,218,0.4); }
+  .cal-day.filled-great { background: rgba(91,201,138,0.18); border-color: rgba(91,201,138,0.4); }
+
+  /* legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+
+  /* DAY DETAIL MODAL */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    display: flex;
+    align-items: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s;
+  }
+  .modal-backdrop.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+  .modal {
+    width: 100%;
+    max-width: 430px;
+    margin: 0 auto;
+    background: var(--surface2);
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px 48px;
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+    max-height: 80dvh;
+    overflow-y: auto;
+  }
+  .modal-backdrop.open .modal { transform: translateY(0); }
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+  .modal-date {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+  .modal-entry {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-entry:last-child { border-bottom: none; }
+  .modal-entry-em { font-size: 28px; flex-shrink: 0; }
+  .modal-entry-body { flex: 1; }
+  .modal-entry-tod {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--hint);
+    margin-bottom: 2px;
+  }
+  .modal-entry-label { font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 2px; }
+  .modal-entry-note { font-size: 14px; color: var(--text); line-height: 1.5; }
+  .modal-empty { color: var(--hint); font-size: 14px; text-align: center; padding: 20px 0; }
+  .modal-close {
+    position: absolute;
+    top: 20px; right: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 32px; height: 32px;
+    color: var(--muted);
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* HISTORY LIST in log tab */
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+  .history-list { display: flex; flex-direction: column; }
+  .entry {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .entry:last-child { border-bottom: none; }
+  .entry-em { font-size: 26px; flex-shrink: 0; line-height: 1; padding-top: 1px; }
+  .entry-body { flex: 1; min-width: 0; }
+  .entry-time { font-size: 11px; font-weight: 600; color: var(--hint); margin-bottom: 2px; }
+  .entry-tod-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--muted);
+    margin-bottom: 2px;
+    margin-left: 4px;
+  }
+  .entry-mood-name { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 2px; }
+  .entry-note { font-size: 14px; color: var(--text); line-height: 1.5; word-break: break-word; }
+  .empty-state { text-align: center; padding: 24px 0; color: var(--hint); font-size: 13px; line-height: 1.6; }
+
+  .streak-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    margin-bottom: 24px;
+  }
+  .streak-icon { font-size: 20px; }
+  .streak-text { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .streak-num { color: var(--accent); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('log')">✏️ Запись</button>
+    <button class="tab" onclick="showTab('cal')">📅 Календарь</button>
+    <button class="tab" onclick="showTab('hist')">📋 История</button>
+  </div>
+
+  <!-- ══════════ TAB: LOG ══════════ -->
+  <div id="tab-log">
+    <div class="header">
+      <div class="date-weekday" id="weekday"></div>
+      <div class="date-full" id="dateStr"></div>
+    </div>
+
+    <div class="streak-bar">
+      <span class="streak-icon">🔥</span>
+      <span class="streak-text">Записей за 7 дней: <span class="streak-num" id="streakNum">0</span></span>
+    </div>
+
+    <!-- Date picker -->
+    <div class="section-label">Дата</div>
+    <div class="date-row" style="margin-bottom:20px;">
+      <input type="date" class="date-input" id="entryDate">
+    </div>
+
+    <!-- Time of day -->
+    <div class="section-label">Время суток</div>
+    <div class="tod-row">
+      <button class="tod-btn selected" data-tod="morning" onclick="selectTod(this)">
+        <span class="tod-em">🌅</span><span class="tod-lbl">Утро</span>
+      </button>
+      <button class="tod-btn" data-tod="day" onclick="selectTod(this)">
+        <span class="tod-em">☀️</span><span class="tod-lbl">День</span>
+      </button>
+      <button class="tod-btn" data-tod="evening" onclick="selectTod(this)">
+        <span class="tod-em">🌙</span><span class="tod-lbl">Вечер</span>
+      </button>
+    </div>
+
+    <!-- Mood -->
+    <div class="section-label">Как ты сейчас?</div>
+    <div class="mood-grid">
+      <button class="mood-btn" data-mood="awful" data-label="Плохо" onclick="selectMood(this)">
+        <span class="em">😞</span><span class="lbl">Плохо</span>
+      </button>
+      <button class="mood-btn" data-mood="meh" data-label="Так себе" onclick="selectMood(this)">
+        <span class="em">😐</span><span class="lbl">Так себе</span>
+      </button>
+      <button class="mood-btn" data-mood="ok" data-label="Норм" onclick="selectMood(this)">
+        <span class="em">🙂</span><span class="lbl">Норм</span>
+      </button>
+      <button class="mood-btn" data-mood="good" data-label="Хорошо" onclick="selectMood(this)">
+        <span class="em">😊</span><span class="lbl">Хорошо</span>
+      </button>
+      <button class="mood-btn" data-mood="great" data-label="Отлично" onclick="selectMood(this)">
+        <span class="em">🤩</span><span class="lbl">Отлично</span>
+      </button>
+    </div>
+
+    <!-- Note -->
+    <div class="note-wrap">
+      <textarea id="noteInput" rows="3" placeholder="Что случилось? Почему так? (необязательно)"></textarea>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <button class="save-btn" onclick="saveEntry()">Сохранить</button>
+  </div>
+
+  <!-- ══════════ TAB: CALENDAR ══════════ -->
+  <div id="tab-cal" class="hidden">
+    <div class="cal-header">
+      <button class="cal-nav" onclick="calShift(-1)">‹</button>
+      <div class="cal-month-label" id="calMonthLabel"></div>
+      <button class="cal-nav" onclick="calShift(1)">›</button>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot mc-awful"></div>Плохо</div>
+      <div class="legend-item"><div class="legend-dot mc-meh"></div>Так себе</div>
+      <div class="legend-item"><div class="legend-dot mc-ok"></div>Норм</div>
+      <div class="legend-item"><div class="legend-dot mc-good"></div>Хорошо</div>
+      <div class="legend-item"><div class="legend-dot mc-great"></div>Отлично</div>
+    </div>
+    <div class="cal-weekdays">
+      <div class="cal-wd">Пн</div><div class="cal-wd">Вт</div><div class="cal-wd">Ср</div>
+      <div class="cal-wd">Чт</div><div class="cal-wd">Пт</div><div class="cal-wd">Сб</div>
+      <div class="cal-wd">Вс</div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <!-- ══════════ TAB: HISTORY ══════════ -->
+  <div id="tab-hist" class="hidden">
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modalBackdrop" onclick="closeModal(event)">
+  <div class="modal" id="modal" style="position:relative;">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div class="modal-date" id="modalDate"></div>
+    <div id="modalEntries"></div>
+  </div>
+</div>
+
+<script>
+  const MOODS = { awful:'😞', meh:'😐', ok:'🙂', good:'😊', great:'🤩' };
+  const MOOD_ORDER = ['awful','meh','ok','good','great'];
+  const DAYS = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+  const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const MONTHS_NOM = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const TOD_LABELS = { morning:'Утро', day:'День', evening:'Вечер' };
+  const TOD_EM = { morning:'🌅', day:'☀️', evening:'🌙' };
+  const TOD_ORDER = ['morning','day','evening'];
+
+  let selectedMood = null;
+  let selectedTod = 'morning';
+  let calYear, calMonth;
+  let currentTab = 'log';
+
+  function init() {
+    const now = new Date();
+    document.getElementById('weekday').textContent = DAYS[now.getDay()];
+    document.getElementById('dateStr').textContent = now.getDate() + '\u00a0' + MONTHS_GEN[now.getMonth()] + ' ' + now.getFullYear();
+    // set date input to today
+    const pad = n => String(n).padStart(2,'0');
+    document.getElementById('entryDate').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+    // auto-select time of day
+    const h = now.getHours();
+    const autoTod = h < 12 ? 'morning' : h < 18 ? 'day' : 'evening';
+    document.querySelectorAll('.tod-btn').forEach(b => {
+      b.classList.toggle('selected', b.dataset.tod === autoTod);
+    });
+    selectedTod = autoTod;
+    calYear = now.getFullYear();
+    calMonth = now.getMonth();
+    renderCalendar();
+    renderHistory();
+    updateStreak();
+  }
+
+  function showTab(tab) {
+    currentTab = tab;
+    ['log','cal','hist'].forEach(t => {
+      document.getElementById('tab-'+t).classList.toggle('hidden', t !== tab);
+    });
+    document.querySelectorAll('.tab').forEach((btn, i) => {
+      btn.classList.toggle('active', ['log','cal','hist'][i] === tab);
+    });
+    if (tab === 'cal') renderCalendar();
+    if (tab === 'hist') renderHistory();
+  }
+
+  function selectMood(btn) {
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedMood = { mood: btn.dataset.mood, label: btn.dataset.label, em: MOODS[btn.dataset.mood] };
+  }
+
+  function selectTod(btn) {
+    document.querySelectorAll('.tod-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedTod = btn.dataset.tod;
+  }
+
+  function saveEntry() {
+    if (!selectedMood) { showToast('Выбери настроение', true); return; }
+    const dateVal = document.getElementById('entryDate').value;
+    if (!dateVal) { showToast('Укажи дату', true); return; }
+    const [y,m,d] = dateVal.split('-').map(Number);
+    const now = new Date();
+    const ts = new Date(y, m-1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
+    const note = document.getElementById('noteInput').value.trim();
+    const entry = {
+      mood: selectedMood.mood,
+      label: selectedMood.label,
+      em: selectedMood.em,
+      note,
+      tod: selectedTod,
+      ts,
+      dateKey: dateVal,
+      display: d + ' ' + MONTHS_GEN[m-1] + ', ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0')
+    };
+    let entries = loadEntries();
+    entries.unshift(entry);
+    if (entries.length > 500) entries = entries.slice(0, 500);
+    localStorage.setItem('mood_entries_v2', JSON.stringify(entries));
+    document.getElementById('noteInput').value = '';
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+    selectedMood = null;
+    showToast('Сохранено ✓', false);
+    updateStreak();
+  }
+
+  function loadEntries() {
+    try { return JSON.parse(localStorage.getItem('mood_entries_v2') || '[]'); }
+    catch(e) { return []; }
+  }
+
+  // dominant mood for a day
+  function dominantMood(entries) {
+    const counts = {};
+    entries.forEach(e => { counts[e.mood] = (counts[e.mood]||0) + 1; });
+    return MOOD_ORDER.slice().reverse().find(m => counts[m]) || null;
+  }
+
+  // ── CALENDAR ──
+  function renderCalendar() {
+    const entries = loadEntries();
+    // group by dateKey
+    const byDate = {};
+    entries.forEach(e => {
+      if (!byDate[e.dateKey]) byDate[e.dateKey] = [];
+      byDate[e.dateKey].push(e);
+    });
+
+    const label = MONTHS_NOM[calMonth] + ' ' + calYear;
+    document.getElementById('calMonthLabel').textContent = label;
+
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+
+    const firstDay = new Date(calYear, calMonth, 1);
+    // Monday-first: 0=Mon..6=Sun
+    let startDow = firstDay.getDay(); // 0=Sun
+    startDow = (startDow + 6) % 7;   // shift to Mon=0
+
+    const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+    const today = new Date();
+    const todayKey = fmtDateKey(today);
+
+    // empty cells before
+    for (let i = 0; i < startDow; i++) {
+      const empty = document.createElement('div');
+      empty.className = 'cal-day empty';
+      grid.appendChild(empty);
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const pad = n => String(n).padStart(2,'0');
+      const dateKey = `${calYear}-${pad(calMonth+1)}-${pad(d)}`;
+      const dayEntries = byDate[dateKey] || [];
+      const dom = document.createElement('div');
+      dom.className = 'cal-day' + (dayEntries.length ? ' has-data' : '') + (dateKey === todayKey ? ' today' : '');
+
+      if (dayEntries.length) {
+        const dm = dominantMood(dayEntries);
+        if (dm) dom.classList.add('filled-'+dm);
+      }
+
+      const num = document.createElement('div');
+      num.className = 'cal-day-num';
+      num.textContent = d;
+      dom.appendChild(num);
+
+      if (dayEntries.length) {
+        const dots = document.createElement('div');
+        dots.className = 'cal-dots';
+        // sort by TOD
+        const sorted = [...dayEntries].sort((a,b) => TOD_ORDER.indexOf(a.tod) - TOD_ORDER.indexOf(b.tod));
+        sorted.slice(0,3).forEach(e => {
+          const dot = document.createElement('div');
+          dot.className = 'cal-dot mc-' + e.mood;
+          dots.appendChild(dot);
+        });
+        dom.appendChild(dots);
+        dom.addEventListener('click', () => openModal(dateKey, dayEntries));
+      }
+
+      grid.appendChild(dom);
+    }
+  }
+
+  function calShift(dir) {
+    calMonth += dir;
+    if (calMonth > 11) { calMonth = 0; calYear++; }
+    if (calMonth < 0)  { calMonth = 11; calYear--; }
+    renderCalendar();
+  }
+
+  // ── MODAL ──
+  function openModal(dateKey, entries) {
+    const [y,m,d] = dateKey.split('-').map(Number);
+    document.getElementById('modalDate').textContent = d + ' ' + MONTHS_GEN[m-1] + ' ' + y;
+    const sorted = [...entries].sort((a,b) => TOD_ORDER.indexOf(a.tod) - TOD_ORDER.indexOf(b.tod));
+    const container = document.getElementById('modalEntries');
+    if (!sorted.length) {
+      container.innerHTML = '<div class="modal-empty">Нет записей за этот день</div>';
+    } else {
+      container.innerHTML = sorted.map(e => `
+        <div class="modal-entry">
+          <div class="modal-entry-em">${e.em || MOODS[e.mood] || '🙂'}</div>
+          <div class="modal-entry-body">
+            <div class="modal-entry-tod">${TOD_EM[e.tod]||''} ${TOD_LABELS[e.tod]||''}</div>
+            <div class="modal-entry-label">${e.label}</div>
+            ${e.note ? `<div class="modal-entry-note">${escHtml(e.note)}</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+    document.getElementById('modalBackdrop').classList.add('open');
+  }
+
+  function closeModal(e) {
+    if (!e || e.target === document.getElementById('modalBackdrop') || e.currentTarget.classList.contains('modal-close')) {
+      document.getElementById('modalBackdrop').classList.remove('open');
+    }
+  }
+
+  // ── HISTORY ──
+  function renderHistory() {
+    const entries = loadEntries();
+    const el = document.getElementById('historyList');
+    if (!entries.length) {
+      el.innerHTML = '<div class="empty-state">Пока нет записей.<br>Сделай первую отметку сегодня.</div>';
+      return;
+    }
+    el.innerHTML = entries.slice(0, 50).map(e => `
+      <div class="entry">
+        <div class="entry-em">${e.em || '🙂'}</div>
+        <div class="entry-body">
+          <div class="entry-time">${e.display || ''}<span class="entry-tod-badge">${TOD_EM[e.tod]||''} ${TOD_LABELS[e.tod]||''}</span></div>
+          <div class="entry-mood-name">${e.label || ''}</div>
+          ${e.note ? `<div class="entry-note">${escHtml(e.note)}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function updateStreak() {
+    const entries = loadEntries();
+    const now = new Date();
+    const days = new Set();
+    entries.forEach(e => {
+      const d = new Date(e.ts);
+      const diff = Math.floor((now - d) / 86400000);
+      if (diff < 7) days.add(d.toDateString());
+    });
+    document.getElementById('streakNum').textContent = days.size;
+  }
+
+  function fmtDateKey(date) {
+    const pad = n => String(n).padStart(2,'0');
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
+  }
+
+  function showToast(msg, isErr) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    setTimeout(() => { t.className = 'toast'; }, 2200);
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  init();
+</script>
+</body>
+</html>
